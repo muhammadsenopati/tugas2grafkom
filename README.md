@@ -39,5 +39,5 @@ Aplikasi ini dirancang sederhana namun lengkap, memungkinkan pengguna menggambar
 3. Jalankan aplikasi dengan perintah:
 python main.py
 
-##📷 Tampilan Aplikasi
+## 📷 Tampilan Aplikasi
 <img width="850" alt="Screenshot 2025-06-12 at 08 42 49" src="https://github.com/user-attachments/assets/3e76be7b-18df-4cf7-8adc-0e1084865eba" />
