@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sketchpad Web</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            background: white;
+            margin: 20px;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .toolbar {
+            background: linear-gradient(90deg, #4f46e5, #7c3aed);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toolbar label {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        select {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 8px;
+            background: white;
+            color: #333;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        select:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .color-preview {
+            width: 40px;
+            height: 40px;
+            border: 3px solid white;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .color-preview:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .action-buttons {
+            margin-left: auto;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        button:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .canvas-container {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #f8fafc;
+        }
+
+        canvas {
+            border: 3px solid #e2e8f0;
+            border-radius: 12px;
+            background: white;
+            cursor: crosshair;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+
+        canvas:hover {
+            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+        }
+
+        #colorPicker {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        @media (max-width: 768px) {
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+
+            .toolbar-group {
+                justify-content: center;
+            }
+
+            .action-buttons {
+                margin-left: 0;
+                justify-content: center;
+            }
+
+            canvas {
+                max-width: 100%;
+                height: auto;
+            }
+        }
+
+        .mode-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .mode-indicator.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="toolbar">
+            <div class="toolbar-group">
+                <label for="mode">Mode:</label>
+                <select id="mode">
+                    <option value="Titik">Titik</option>
+                    <option value="TitikBersambung">Titik Bersambung</option>
+                    <option value="Garis">Garis</option>
+                    <option value="Persegi">Persegi</option>
+                    <option value="Lingkaran">Lingkaran</option>
+                    <option value="Elips">Elips</option>
+                    <option value="Hapus">Hapus</option>
+                </select>
+            </div>
+
+            <div class="toolbar-group">
+                <label>Warna:</label>
+                <div class="color-preview" id="colorPreview"></div>
+                <input type="color" id="colorPicker" value="#000000">
+            </div>
+
+            <div class="action-buttons">
+                <button id="undoBtn">Undo</button>
+                <button id="redoBtn">Redo</button>
+                <button id="clearBtn">Clear All</button>
+            </div>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="canvas" width="800" height="500"></canvas>
+            <div class="mode-indicator" id="modeIndicator">Titik</div>
+        </div>
+    </div>
+
+    <script>
+        class DrawingApp {
+            constructor() {
+                this.canvas = document.getElementById('canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.mode = 'Titik';
+                this.color = '#000000';
+                this.startX = null;
+                this.startY = null;
+                this.isDrawing = false;
+                this.currentPreview = null;
+                
+                this.shapes = [];
+                this.undoStack = [];
+                this.currentPath = null; // For freehand drawing
+                
+                this.setupEventListeners();
+                this.updateColorPreview();
+            }
+
+            setupEventListeners() {
+                // Mode selector
+                document.getElementById('mode').addEventListener('change', (e) => {
+                    this.mode = e.target.value;
+                    this.showModeIndicator();
+                });
+
+                // Color picker
+                document.getElementById('colorPreview').addEventListener('click', () => {
+                    document.getElementById('colorPicker').click();
+                });
+
+                document.getElementById('colorPicker').addEventListener('change', (e) => {
+                    this.color = e.target.value;
+                    this.updateColorPreview();
+                });
+
+                // Action buttons
+                document.getElementById('undoBtn').addEventListener('click', () => this.undo());
+                document.getElementById('redoBtn').addEventListener('click', () => this.redo());
+                document.getElementById('clearBtn').addEventListener('click', () => this.clearCanvas());
+
+                // Canvas events
+                this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
+                this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
+                this.canvas.addEventListener('mouseup', (e) => this.onMouseUp(e));
+                this.canvas.addEventListener('mouseleave', (e) => this.onMouseUp(e));
+
+                // Touch events for mobile
+                this.canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const mouseEvent = new MouseEvent('mousedown', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY
+                    });
+                    this.canvas.dispatchEvent(mouseEvent);
+                });
+
+                this.canvas.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const mouseEvent = new MouseEvent('mousemove', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY
+                    });
+                    this.canvas.dispatchEvent(mouseEvent);
+                });
+
+                this.canvas.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    const mouseEvent = new MouseEvent('mouseup', {});
+                    this.canvas.dispatchEvent(mouseEvent);
+                });
+            }
+
+            getMousePos(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                return {
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                };
+            }
+
+            onMouseDown(e) {
+                const pos = this.getMousePos(e);
+                this.startX = pos.x;
+                this.startY = pos.y;
+                this.isDrawing = true;
+
+                if (this.mode === 'Titik') {
+                    this.drawPoint(pos.x, pos.y);
+                    this.addToHistory();
+                } else if (this.mode === 'TitikBersambung') {
+                    this.startFreehand(pos.x, pos.y);
+                } else if (this.mode === 'Hapus') {
+                    this.eraseAt(pos.x, pos.y);
+                }
+            }
+
+            onMouseMove(e) {
+                if (!this.isDrawing) return;
+
+                const pos = this.getMousePos(e);
+
+                if (this.mode === 'TitikBersambung') {
+                    this.continueFreehand(pos.x, pos.y);
+                } else if (['Garis', 'Persegi', 'Lingkaran', 'Elips'].includes(this.mode)) {
+                    this.redrawCanvas();
+                    this.drawPreview(this.startX, this.startY, pos.x, pos.y);
+                }
+            }
+
+            onMouseUp(e) {
+                if (!this.isDrawing) return;
+                this.isDrawing = false;
+
+                if (this.mode === 'Titik' || this.mode === 'Hapus') return;
+                
+                if (this.mode === 'TitikBersambung') {
+                    this.finishFreehand();
+                    return;
+                }
+
+                const pos = this.getMousePos(e);
+                this.drawFinalShape(this.startX, this.startY, pos.x, pos.y);
+                this.addToHistory();
+            }
+
+            drawPoint(x, y) {
+                this.ctx.fillStyle = this.color;
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, 2, 0, 2 * Math.PI);
+                this.ctx.fill();
+            }
+
+            startFreehand(x, y) {
+                this.currentPath = {
+                    type: 'TitikBersambung',
+                    color: this.color,
+                    points: [{x, y}]
+                };
+                
+                this.ctx.strokeStyle = this.color;
+                this.ctx.lineWidth = 2;
+                this.ctx.lineCap = 'round';
+                this.ctx.lineJoin = 'round';
+                this.ctx.beginPath();
+                this.ctx.moveTo(x, y);
+            }
+
+            continueFreehand(x, y) {
+                if (!this.currentPath) return;
+                
+                this.currentPath.points.push({x, y});
+                this.ctx.lineTo(x, y);
+                this.ctx.stroke();
+            }
+
+            finishFreehand() {
+                if (this.currentPath && this.currentPath.points.length > 1) {
+                    this.shapes.push(this.currentPath);
+                    this.addToHistory();
+                }
+                this.currentPath = null;
+            }
+
+            drawPreview(x1, y1, x2, y2) {
+                this.ctx.strokeStyle = this.color;
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+
+                switch (this.mode) {
+                    case 'Garis':
+                        this.ctx.moveTo(x1, y1);
+                        this.ctx.lineTo(x2, y2);
+                        break;
+                    case 'Persegi':
+                        this.ctx.rect(x1, y1, x2 - x1, y2 - y1);
+                        break;
+                    case 'Lingkaran':
+                        const radius = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+                        this.ctx.arc(x1, y1, radius, 0, 2 * Math.PI);
+                        break;
+                    case 'Elips':
+                        this.ctx.ellipse((x1 + x2) / 2, (y1 + y2) / 2, 
+                                        Math.abs(x2 - x1) / 2, Math.abs(y2 - y1) / 2, 
+                                        0, 0, 2 * Math.PI);
+                        break;
+                }
+                this.ctx.stroke();
+            }
+
+            drawFinalShape(x1, y1, x2, y2) {
+                const shapeData = {
+                    type: this.mode,
+                    x1, y1, x2, y2,
+                    color: this.color
+                };
+
+                this.shapes.push(shapeData);
+                this.redrawCanvas();
+            }
+
+            eraseAt(x, y) {
+                // Find and remove shapes at clicked position
+                for (let i = this.shapes.length - 1; i >= 0; i--) {
+                    const shape = this.shapes[i];
+                    if (this.isPointInShape(x, y, shape)) {
+                        this.undoStack.push(this.shapes.splice(i, 1)[0]);
+                        this.redrawCanvas();
+                        break;
+                    }
+                }
+            }
+
+            isPointInShape(x, y, shape) {
+                const tolerance = 5;
+                switch (shape.type) {
+                    case 'Titik':
+                        return Math.sqrt((x - shape.x1) ** 2 + (y - shape.y1) ** 2) <= tolerance;
+                    case 'TitikBersambung':
+                        if (!shape.points) return false;
+                        // Check if point is near any segment of the path
+                        for (let i = 0; i < shape.points.length - 1; i++) {
+                            const dist = this.pointToLineDistance(x, y, 
+                                shape.points[i].x, shape.points[i].y,
+                                shape.points[i + 1].x, shape.points[i + 1].y);
+                            if (dist <= tolerance) return true;
+                        }
+                        return false;
+                    case 'Garis':
+                        // Simple line hit detection
+                        const dist = this.pointToLineDistance(x, y, shape.x1, shape.y1, shape.x2, shape.y2);
+                        return dist <= tolerance;
+                    case 'Persegi':
+                        return x >= Math.min(shape.x1, shape.x2) - tolerance && 
+                               x <= Math.max(shape.x1, shape.x2) + tolerance &&
+                               y >= Math.min(shape.y1, shape.y2) - tolerance && 
+                               y <= Math.max(shape.y1, shape.y2) + tolerance;
+                    case 'Lingkaran':
+                        const radius = Math.sqrt((shape.x2 - shape.x1) ** 2 + (shape.y2 - shape.y1) ** 2);
+                        const centerDist = Math.sqrt((x - shape.x1) ** 2 + (y - shape.y1) ** 2);
+                        return Math.abs(centerDist - radius) <= tolerance;
+                    case 'Elips':
+                        // Simplified ellipse hit detection
+                        const cx = (shape.x1 + shape.x2) / 2;
+                        const cy = (shape.y1 + shape.y2) / 2;
+                        return Math.sqrt((x - cx) ** 2 + (y - cy) ** 2) <= tolerance * 3;
+                    default:
+                        return false;
+                }
+            }
+
+            pointToLineDistance(px, py, x1, y1, x2, y2) {
+                const A = px - x1;
+                const B = py - y1;
+                const C = x2 - x1;
+                const D = y2 - y1;
+
+                const dot = A * C + B * D;
+                const lenSq = C * C + D * D;
+                let param = -1;
+                if (lenSq !== 0) param = dot / lenSq;
+
+                let xx, yy;
+                if (param < 0) {
+                    xx = x1;
+                    yy = y1;
+                } else if (param > 1) {
+                    xx = x2;
+                    yy = y2;
+                } else {
+                    xx = x1 + param * C;
+                    yy = y1 + param * D;
+                }
+
+                return Math.sqrt((px - xx) ** 2 + (py - yy) ** 2);
+            }
+
+            redrawCanvas() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                this.shapes.forEach(shape => {
+                    this.ctx.strokeStyle = shape.color;
+                    this.ctx.fillStyle = shape.color;
+                    this.ctx.lineWidth = 2;
+                    this.ctx.beginPath();
+
+                    switch (shape.type) {
+                        case 'Titik':
+                            this.ctx.arc(shape.x1, shape.y1, 2, 0, 2 * Math.PI);
+                            this.ctx.fill();
+                            break;
+                        case 'TitikBersambung':
+                            if (shape.points && shape.points.length > 1) {
+                                this.ctx.strokeStyle = shape.color;
+                                this.ctx.lineWidth = 2;
+                                this.ctx.lineCap = 'round';
+                                this.ctx.lineJoin = 'round';
+                                this.ctx.beginPath();
+                                this.ctx.moveTo(shape.points[0].x, shape.points[0].y);
+                                for (let i = 1; i < shape.points.length; i++) {
+                                    this.ctx.lineTo(shape.points[i].x, shape.points[i].y);
+                                }
+                                this.ctx.stroke();
+                            }
+                            break;
+                        case 'Garis':
+                            this.ctx.moveTo(shape.x1, shape.y1);
+                            this.ctx.lineTo(shape.x2, shape.y2);
+                            this.ctx.stroke();
+                            break;
+                        case 'Persegi':
+                            this.ctx.rect(shape.x1, shape.y1, shape.x2 - shape.x1, shape.y2 - shape.y1);
+                            this.ctx.stroke();
+                            break;
+                        case 'Lingkaran':
+                            const radius = Math.sqrt((shape.x2 - shape.x1) ** 2 + (shape.y2 - shape.y1) ** 2);
+                            this.ctx.arc(shape.x1, shape.y1, radius, 0, 2 * Math.PI);
+                            this.ctx.stroke();
+                            break;
+                        case 'Elips':
+                            this.ctx.ellipse((shape.x1 + shape.x2) / 2, (shape.y1 + shape.y2) / 2,
+                                           Math.abs(shape.x2 - shape.x1) / 2, Math.abs(shape.y2 - shape.y1) / 2,
+                                           0, 0, 2 * Math.PI);
+                            this.ctx.stroke();
+                            break;
+                    }
+                });
+            }
+
+            undo() {
+                if (this.shapes.length > 0) {
+                    const shape = this.shapes.pop();
+                    this.undoStack.push(shape);
+                    this.redrawCanvas();
+                }
+            }
+
+            redo() {
+                if (this.undoStack.length > 0) {
+                    const shape = this.undoStack.pop();
+                    this.shapes.push(shape);
+                    this.redrawCanvas();
+                }
+            }
+
+            clearCanvas() {
+                this.shapes = [];
+                this.undoStack = [];
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            }
+
+            addToHistory() {
+                this.undoStack = []; // Clear redo stack when new action is performed
+            }
+
+            updateColorPreview() {
+                document.getElementById('colorPreview').style.backgroundColor = this.color;
+            }
+
+            showModeIndicator() {
+                const indicator = document.getElementById('modeIndicator');
+                indicator.textContent = this.mode;
+                indicator.classList.add('show');
+                setTimeout(() => {
+                    indicator.classList.remove('show');
+                }, 1500);
+            }
+        }
+
+        // Initialize the app when the page loads
+        window.addEventListener('load', () => {
+            new DrawingApp();
+        });
+    </script>
+</body>
+</html>
